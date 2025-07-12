@@ -1,0 +1,15 @@
+{
+	"compilerOptions": {
+		"target": "ES2021",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"outDir": "dist",
+		"allowJs": true,
+		"checkJs": true,
+		"strict": true,
+		"types": ["node"],
+		"sourceMap": true,
+		"declaration": true,
+	},
+	"include": ["src/parser.ts"]
+}
