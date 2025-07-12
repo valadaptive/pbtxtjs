@@ -193,24 +193,21 @@ class Tokenizer {
         }
     }
     consumeString() {
-        const bytes = this.consumeByteString();
-        return new TextDecoder('utf-8').decode(bytes);
-    }
-    consumeByteString() {
-        const parts = [this._consumeSingleByteString()];
+        let result = this._consumeByteString();
         while (this.token && _QUOTES.has(this.token[0])) {
-            parts.push(this._consumeSingleByteString());
-        }
-        const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const part of parts) {
-            result.set(part, offset);
-            offset += part.length;
+            result += this._consumeByteString();
         }
         return result;
     }
-    _consumeSingleByteString() {
+    consumeByteString() {
+        const text = this._consumeByteString();
+        const dest = new Uint8Array(text.length);
+        for (let i = 0; i < text.length; i++) {
+            dest[i] = text.charCodeAt(i);
+        }
+        return dest;
+    }
+    _consumeByteString() {
         const text = this.token;
         if (text.length < 1 || !_QUOTES.has(text[0])) {
             throw this.parseError(`Expected string but found: ${text}`);
@@ -244,80 +241,106 @@ Tokenizer._WHITESPACE_OR_COMMENT = /(?:\s|#.*)+/g;
 Tokenizer._TOKEN = /[a-zA-Z_][0-9a-zA-Z_+-]*|([0-9+-]|(\.[0-9]))[0-9a-zA-Z_.+-]*|\"([^\"\n\\]|\\.)*(\"|\\?$)|'([^'\n\\]|\\.)*('|\\?$)/;
 Tokenizer._IDENTIFIER = /[a-zA-Z_][0-9a-zA-Z_]*/;
 function cUnescape(source) {
-    const result = [];
+    let result = '';
     let i = 0;
     while (i < source.length) {
-        if (source[i] === '\\' && i + 1 < source.length) {
+        if (source[i] === '\\') {
             i++;
-            const char = source[i];
-            if (char >= '0' && char <= '7') {
-                let code = char.charCodeAt(0) - '0'.charCodeAt(0);
-                if (i + 1 < source.length && source[i + 1] >= '0' && source[i + 1] <= '7') {
+            switch (source[i]) {
+                // Simple single-character escapes
+                case 'a':
+                    result += '\x07';
+                    break;
+                case 'b':
+                    result += '\b';
+                    break;
+                case 'f':
+                    result += '\f';
+                    break;
+                case 'n':
+                    result += '\n';
+                    break;
+                case 'r':
+                    result += '\r';
+                    break;
+                case 't':
+                    result += '\t';
+                    break;
+                case 'v':
+                    result += '\v';
+                    break;
+                case '?':
+                    result += '?';
+                    break;
+                case '\\':
+                    result += '\\';
+                    break;
+                case '\'':
+                    result += '\'';
+                    break;
+                case '"':
+                    result += '"';
+                    break;
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7': {
+                    let octal = '';
+                    for (let j = 0; j < 3 && i < source.length && /[0-7]/.test(source[i]); i++, j++) {
+                        octal += source[i];
+                    }
+                    result += String.fromCharCode(parseInt(octal, 8));
+                    break;
+                }
+                case 'x': {
                     i++;
-                    code = (code * 8) + (source[i].charCodeAt(0) - '0'.charCodeAt(0));
+                    let hex = '';
+                    for (let j = 0; j < 2 && i < source.length && /[0-9a-fA-F]/.test(source[i]); i++, j++) {
+                        hex += source[i];
+                    }
+                    result += String.fromCharCode(parseInt(hex, 16));
+                    break;
                 }
-                if (i + 1 < source.length && source[i + 1] >= '0' && source[i + 1] <= '7') {
+                case 'u': {
                     i++;
-                    code = (code * 8) + (source[i].charCodeAt(0) - '0'.charCodeAt(0));
+                    let unicode = '';
+                    for (let j = 0; j < 4; i++, j++) {
+                        unicode += source[i];
+                    }
+                    result += String.fromCharCode(parseInt(unicode, 16));
+                    break;
                 }
-                result.push(code);
-            }
-            else if (char === 'x' || char === 'X') {
-                if (i + 2 < source.length && /[0-9a-fA-F]/.test(source[i + 1]) && /[0-9a-fA-F]/.test(source[i + 2])) {
-                    result.push(parseInt(source.substring(i + 1, i + 3), 16));
-                    i += 2;
+                case 'U': {
+                    i++;
+                    const isFourByte = source.slice(i, i + 4) === '0010';
+                    const numDigits = isFourByte ? 4 : 5;
+                    if (isFourByte) {
+                        i += 4;
+                    }
+                    else {
+                        i += 3;
+                    }
+                    let unicode = '';
+                    for (let j = 0; j < numDigits; i++, j++) {
+                        unicode += source[i];
+                    }
+                    result += String.fromCodePoint(parseInt(unicode, 16));
+                    break;
                 }
-                else {
-                    result.push(char.charCodeAt(0));
-                }
-            }
-            else {
-                switch (char) {
-                    case 'a':
-                        result.push(0x07);
-                        break;
-                    case 'b':
-                        result.push(0x08);
-                        break;
-                    case 'f':
-                        result.push(0x0c);
-                        break;
-                    case 'n':
-                        result.push(0x0a);
-                        break;
-                    case 'r':
-                        result.push(0x0d);
-                        break;
-                    case 't':
-                        result.push(0x09);
-                        break;
-                    case 'v':
-                        result.push(0x0b);
-                        break;
-                    case '\\':
-                        result.push(0x5c);
-                        break;
-                    case '?':
-                        result.push(0x3f);
-                        break;
-                    case "'":
-                        result.push(0x27);
-                        break;
-                    case '"':
-                        result.push(0x22);
-                        break;
-                    default:
-                        result.push(char.charCodeAt(0));
-                        break;
-                }
+                default:
+                    result += source[i];
             }
         }
         else {
-            result.push(source.charCodeAt(i));
+            result += source[i];
+            i++;
         }
-        i++;
     }
-    return new Uint8Array(result);
+    return result;
 }
 /**
  * Parses a text representation of a protocol message into a message.
