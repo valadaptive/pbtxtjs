@@ -377,9 +377,7 @@ test('Parser - Nested messages', async(t) => {
   t.equal(message.repeatedNested[1].number, 2, 'second repeated nested number correct');
 });
 
-// TODO: Fix map field parsing
-/*
-test('Parser - Map fields', async (t) => {
+test('Parser - Map fields', async(t) => {
   const text = await loadFixture('maps.textpb');
   const message = createAndParse(text, TestMessage);
 
@@ -392,7 +390,6 @@ test('Parser - Map fields', async (t) => {
   t.equal(message.intMessageMap[10].value, 'mapped message', 'mapped message value correct');
   t.equal(message.intMessageMap[10].number, 999, 'mapped message number correct');
 });
-*/
 
 test('Parser - Comments and whitespace', async(t) => {
   const text = await loadFixture('comments.textpb');
@@ -598,9 +595,7 @@ test('Parser - Negative hex and octal with 64-bit integers', async(t) => {
   }
 });
 
-// TODO: Fix complex nested structures
-/*
-test('Parser - Complex nested structures', async (t) => {
+test('Parser - Complex nested structures', async(t) => {
   const complexText = `
     string_field: "root message"
     nested_message {
@@ -634,7 +629,6 @@ test('Parser - Complex nested structures', async (t) => {
   t.equal(message.enumField, TestEnum.values.ENUM_VALUE_TWO, 'enum field correct');
   t.equal(message.boolField, true, 'bool field correct');
 });
-*/
 
 test('Parser - Empty message', async(t) => {
   const emptyText = '';

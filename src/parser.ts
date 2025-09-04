@@ -536,7 +536,24 @@ class Parser {
 
     field.resolve();
     if (field.map) {
-      this.mergeMapField(tokenizer, message, field);
+      tokenizer.tryConsume(':');
+      if (tokenizer.tryConsume('[')) {
+        // List syntax for map fields: my_map: [{ key: "k1" value: "v1" }, { key: "k2" value: "v2" }]
+        if (tokenizer.tryConsume(']')) {
+          // Empty list - don't set the field (treat as absent)
+        } else {
+          while (true) {
+            this.mergeMapFieldEntry(tokenizer, message, field);
+            if (tokenizer.tryConsume(']')) {
+              break;
+            }
+            tokenizer.consume(',');
+          }
+        }
+      } else {
+        // Single map entry: my_map { key: "k1" value: "v1" }
+        this.mergeMapFieldEntry(tokenizer, message, field);
+      }
     } else if (field.resolvedType) {
       // Use duck-typing to check for an enum. An Enum object has `valuesById`.
       if ('valuesById' in field.resolvedType) {
@@ -664,8 +681,11 @@ class Parser {
     }
   }
 
-  private mergeMapField<T extends protobuf.Message>(tokenizer: Tokenizer, message: T, field: protobuf.Field): void {
-    tokenizer.tryConsume(':');
+  private mergeMapFieldEntry<T extends protobuf.Message>(
+    tokenizer: Tokenizer,
+    message: T,
+    field: protobuf.Field,
+  ): void {
     const endToken = tokenizer.tryConsume('<') ? '>' : (tokenizer.consume('{'), '}');
     const mapField = field as unknown as protobuf.MapField;
 
@@ -679,22 +699,32 @@ class Parser {
 
     while (true) {
       const name = tokenizer.consumeIdentifier();
-      tokenizer.consume(':');
 
       if (name === 'key') {
+        // Key is always scalar, so ':' is required
+        tokenizer.consume(':');
         key = this.parseScalar(tokenizer, mapField.keyType);
       } else if (name === 'value') {
         const valueType = mapField.type;
         try {
+          // Try to resolve as message type first
           const resolvedValueType = mapField.root.lookupType(valueType);
+          // This is a message type, so ':' is optional
+          tokenizer.tryConsume(':');
           const subMessage = resolvedValueType.create();
-          // Create a dummy field for the recursive call
-          const dummyField = new protobuf.Field('value', 2, valueType);
-          dummyField.parent = resolvedValueType;
-          this.mergeMessageField(tokenizer, subMessage, dummyField, false);
+
+          // Parse the message content directly
+          const messageEndToken = tokenizer.tryConsume('<') ? '>' : (tokenizer.consume('{'), '}');
+
+          while (!tokenizer.tryConsume(messageEndToken)) {
+            this.mergeField(tokenizer, subMessage);
+          }
+
           value = subMessage;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch(_e) {
+          // This is a scalar type, so ':' is required
+          tokenizer.consume(':');
           value = this.parseScalar(tokenizer, valueType);
         }
       } else {
