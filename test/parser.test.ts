@@ -753,3 +753,107 @@ test('Error messages contain line and column information', async(t) => {
     t.ok((error as ParseError).column !== undefined, 'Error has column property');
   }
 });
+
+test('Parser - Extension fields', async(t) => {
+  // Test extension field parsing - when extension is not found, it falls back to allowUnknownField
+  const extensionText = '[unknown.extension]: "value"\nstring_field: "known"';
+
+  t.throws(() => {
+    createAndParse(extensionText, TestMessage, {allowUnknownExtension: false, allowUnknownField: false});
+  }, ParseError, 'throws error for unknown extension when not allowed');
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(extensionText, TestMessage, {allowUnknownExtension: true, allowUnknownField: true});
+    t.equal(message.stringField, 'known', 'known field still parsed with unknown extension allowed');
+  }, 'does not throw error for unknown extension when allowed');
+
+  // Test the specific allowUnknownExtension error path for when extension exists but doesn't extend the message
+  // We need to create a scenario where the extension exists but is invalid
+  // For now, test the error path directly with a simpler case
+  t.throws(() => {
+    createAndParse('[non.existent]: "value"', TestMessage, {allowUnknownExtension: false});
+  }, ParseError, 'throws error for extension not found when allowUnknownExtension is false');
+});
+
+test('Parser - Tokenizer error paths', async(t) => {
+  // Test consumeIdentifierOrNumber error path with invalid token
+  const invalidIdentifierText = 'string_field: "valid"\n}: invalid';
+
+  t.throws(() => {
+    createAndParse(invalidIdentifierText, TestMessage);
+  }, ParseError, 'throws error for invalid identifier token');
+
+  // Test atEnd condition in tryConsumeAnyScalar through skipFieldValue
+  const truncatedText = 'unknown_field:';
+
+  t.throws(() => {
+    createAndParse(truncatedText, TestMessage, {allowUnknownField: true});
+  }, ParseError, 'throws error for truncated field value');
+});
+
+test('Parser - Enum parsing fallback', async(t) => {
+  // Test enum parsing that falls back from number to string
+  // First, test with a string that looks like a number but fails to parse
+  const invalidEnumNumberText = 'enum_field: "not_a_number_but_looks_like_one"';
+
+  t.throws(() => {
+    createAndParse(invalidEnumNumberText, TestMessage);
+  }, ParseError, 'throws error for invalid enum string');
+
+  // Test with valid enum string
+  const validEnumText = 'enum_field: ENUM_VALUE_ONE';
+  t.doesNotThrow(() => {
+    const message = createAndParse(validEnumText, TestMessage);
+    t.equal(message.enumField, TestEnum.values.ENUM_VALUE_ONE, 'enum string parsed correctly');
+  }, 'parses valid enum string');
+});
+
+test('Parser - Utility functions coverage', async(t) => {
+  // Test toPascalCase indirectly through map field parsing (which uses it internally)
+  // This will exercise the toPascalCase function that converts snake_case to PascalCase
+  const mapText = 'string_int_map { key: "test" value: 42 }';
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(mapText, TestMessage);
+    t.equal(message.stringIntMap.test, 42, 'map field parsed correctly');
+  }, 'map field parsing exercises toPascalCase function');
+});
+
+test('Parser - Additional error paths', async(t) => {
+  // Test string parsing error in _consumeByteString (non-Error exception)
+  // This is difficult to trigger directly, but we can test error path in general
+  const malformedStringText = 'string_field: "unclosed string';
+
+  t.throws(() => {
+    createAndParse(malformedStringText, TestMessage);
+  }, ParseError, 'throws error for malformed string');
+
+  // Test enum parsing with hex number that exists as enum value
+  const hexEnumText = 'enum_field: 0x1';
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(hexEnumText, TestMessage);
+    t.equal(message.enumField, 1, 'hex enum value parsed correctly');
+  }, 'parses hex enum value');
+
+  // Test enum parsing error fallback
+  const invalidEnumText = 'enum_field: INVALID_ENUM_VALUE';
+
+  t.throws(() => {
+    createAndParse(invalidEnumText, TestMessage);
+  }, ParseError, 'throws error for invalid enum value');
+
+  // Test toPascalCase with different patterns through map entry parsing
+  const mapEntryText = 'int_message_map { key: 1 value { value: "test" } }';
+
+  t.doesNotThrow(() => {
+    createAndParse(mapEntryText, TestMessage);
+  }, 'parses map entry (exercises toPascalCase with different input)');
+
+  // Test empty identifier/number case in tokenizer
+  const emptyIdentifierText = 'string_field: "valid"\n123: "field_by_number"';
+
+  t.throws(() => {
+    createAndParse(emptyIdentifierText, TestMessage);
+  }, ParseError, 'throws error for field number without allowFieldNumber');
+});
