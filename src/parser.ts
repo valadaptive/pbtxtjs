@@ -539,17 +539,9 @@ class Parser {
       tokenizer.tryConsume(':');
       if (tokenizer.tryConsume('[')) {
         // List syntax for map fields: my_map: [{ key: "k1" value: "v1" }, { key: "k2" value: "v2" }]
-        if (tokenizer.tryConsume(']')) {
-          // Empty list - don't set the field (treat as absent)
-        } else {
-          while (true) {
-            this.mergeMapFieldEntry(tokenizer, message, field);
-            if (tokenizer.tryConsume(']')) {
-              break;
-            }
-            tokenizer.consume(',');
-          }
-        }
+        this.parseList(tokenizer, message, field, () => {
+          this.mergeMapFieldEntry(tokenizer, message, field);
+        });
       } else {
         // Single map entry: my_map { key: "k1" value: "v1" }
         this.mergeMapFieldEntry(tokenizer, message, field);
@@ -566,18 +558,9 @@ class Parser {
             (message as any)[field.name] = [];
           }
 
-          if (tokenizer.tryConsume(']')) {
-            // Empty list - don't set the field (treat as absent, will be undefined in toObject())
-            // This matches JavaScript protobuf behavior for absent repeated fields
-          } else {
-            while (true) {
-              this.mergeScalarField(tokenizer, message, field);
-              if (tokenizer.tryConsume(']')) {
-                break;
-              }
-              tokenizer.consume(',');
-            }
-          }
+          this.parseList(tokenizer, message, field, () => {
+            this.mergeScalarField(tokenizer, message, field);
+          });
         } else {
           this.mergeScalarField(tokenizer, message, field);
         }
@@ -591,18 +574,9 @@ class Parser {
             (message as any)[field.name] = [];
           }
 
-          if (tokenizer.tryConsume(']')) {
-            // Empty list - don't set the field (treat as absent, will be undefined in toObject())
-            // This matches JavaScript protobuf behavior for absent repeated fields
-          } else {
-            while (true) {
-              this.mergeMessageField(tokenizer, message, field, false);
-              if (tokenizer.tryConsume(']')) {
-                break;
-              }
-              tokenizer.consume(',');
-            }
-          }
+          this.parseList(tokenizer, message, field, () => {
+            this.mergeMessageField(tokenizer, message, field, false);
+          });
         } else {
           this.mergeMessageField(tokenizer, message, field, false);
         }
@@ -616,18 +590,9 @@ class Parser {
           (message as any)[field.name] = [];
         }
 
-        if (tokenizer.tryConsume(']')) {
-          // Empty list - don't set the field (treat as absent, will be undefined in toObject())
-          // This matches JavaScript protobuf behavior for absent repeated fields
-        } else {
-          while (true) {
-            this.mergeScalarField(tokenizer, message, field);
-            if (tokenizer.tryConsume(']')) {
-              break;
-            }
-            tokenizer.consume(',');
-          }
-        }
+        this.parseList(tokenizer, message, field, () => {
+          this.mergeScalarField(tokenizer, message, field);
+        });
       } else {
         this.mergeScalarField(tokenizer, message, field);
       }
@@ -635,6 +600,26 @@ class Parser {
 
     if (tokenizer.tryConsume(',')) {
       // consume optional separator
+    }
+  }
+
+  private parseList<T extends protobuf.Message>(
+    tokenizer: Tokenizer,
+    message: T,
+    field: protobuf.Field,
+    parseItem: () => void,
+  ): void {
+    if (tokenizer.tryConsume(']')) {
+      // Empty list - don't set the field (treat as absent, will be undefined in toObject())
+      // This matches JavaScript protobuf behavior for absent repeated fields
+    } else {
+      while (true) {
+        parseItem();
+        if (tokenizer.tryConsume(']')) {
+          break;
+        }
+        tokenizer.consume(',');
+      }
     }
   }
 
