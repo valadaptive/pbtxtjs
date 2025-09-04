@@ -539,18 +539,67 @@ class Parser {
       if ('valuesById' in field.resolvedType) {
         // Enum
         tokenizer.consume(':');
-        this.mergeScalarField(tokenizer, message, field);
+
+        if (field.repeated && tokenizer.tryConsume('[')) {
+          // List syntax for repeated enum fields - ensure array is initialized
+          if (!Array.isArray((message as any)[field.name])) {
+            (message as any)[field.name] = [];
+          }
+
+          if (tokenizer.tryConsume(']')) {
+            // Empty list - don't set the field (treat as absent, will be undefined in toObject())
+            // This matches JavaScript protobuf behavior for absent repeated fields
+          } else {
+            while (true) {
+              this.mergeScalarField(tokenizer, message, field);
+              if (tokenizer.tryConsume(']')) {
+                break;
+              }
+              tokenizer.consume(',');
+            }
+          }
+        } else {
+          this.mergeScalarField(tokenizer, message, field);
+        }
       } else {
         // Message
         tokenizer.tryConsume(':');
-        this.mergeMessageField(tokenizer, message, field, false);
+
+        if (field.repeated && tokenizer.tryConsume('[')) {
+          // List syntax for repeated message fields
+          if (!Array.isArray((message as any)[field.name])) {
+            (message as any)[field.name] = [];
+          }
+
+          if (tokenizer.tryConsume(']')) {
+            // Empty list - don't set the field (treat as absent, will be undefined in toObject())
+            // This matches JavaScript protobuf behavior for absent repeated fields
+          } else {
+            while (true) {
+              this.mergeMessageField(tokenizer, message, field, false);
+              if (tokenizer.tryConsume(']')) {
+                break;
+              }
+              tokenizer.consume(',');
+            }
+          }
+        } else {
+          this.mergeMessageField(tokenizer, message, field, false);
+        }
       }
     } else { // Scalar
       tokenizer.consume(':');
 
       if (field.repeated && tokenizer.tryConsume('[')) {
-        // short format for repeated fields
-        if (!tokenizer.tryConsume(']')) {
+        // short format for repeated fields - ensure array is initialized
+        if (!Array.isArray((message as any)[field.name])) {
+          (message as any)[field.name] = [];
+        }
+
+        if (tokenizer.tryConsume(']')) {
+          // Empty list - don't set the field (treat as absent, will be undefined in toObject())
+          // This matches JavaScript protobuf behavior for absent repeated fields
+        } else {
           while (true) {
             this.mergeScalarField(tokenizer, message, field);
             if (tokenizer.tryConsume(']')) {

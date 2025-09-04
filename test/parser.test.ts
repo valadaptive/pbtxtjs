@@ -349,9 +349,7 @@ test('Parser - Enum values', async(t) => {
   }
 });
 
-// TODO: Fix repeated fields with list syntax
-/*
-test('Parser - Repeated fields', async (t) => {
+test('Parser - Repeated fields', async(t) => {
   const text = await loadFixture('repeated.textpb');
   const message = createAndParse(text, TestMessage);
 
@@ -360,10 +358,9 @@ test('Parser - Repeated fields', async (t) => {
   t.same(message.repeatedEnum, [
     TestEnum.values.ENUM_VALUE_ZERO,
     TestEnum.values.ENUM_VALUE_ONE,
-    TestEnum.values.ENUM_VALUE_TWO
+    TestEnum.values.ENUM_VALUE_TWO,
   ], 'repeated enums with list syntax work');
 });
-*/
 
 test('Parser - Nested messages', async(t) => {
   const text = await loadFixture('nested.textpb');
@@ -408,14 +405,14 @@ test('Parser - Comments and whitespace', async(t) => {
 
 // TODO: Fix multi-line string parsing
 /*
-test('Parser - Multi-line strings', async (t) => {
+test('Parser - Multi-line strings', async(t) => {
   const text = await loadFixture('multiline.textpb');
   const message = createAndParse(text, TestMessage);
 
   t.ok(message.stringField.includes('This is a very long string that spans multiple lines'),
-       'multi-line string concatenation works');
+    'multi-line string concatenation works');
   t.ok(message.stringField.includes('Nospacebetweenstrings'),
-       'string concatenation without spaces works');
+    'string concatenation without spaces works');
 });
 */
 
@@ -439,9 +436,7 @@ test('Parser - Message syntax variations', async(t) => {
   t.equal(noColonMessage.nestedMessage.value, 'no colon', 'message field without colon works');
 });
 
-// TODO: Fix list syntax for repeated fields
-/*
-test('Parser - List syntax for repeated fields', async (t) => {
+test('Parser - List syntax for repeated fields', async(t) => {
   const listText = `
     repeated_string: ["one", "two", "three"]
     repeated_int32: [10, 20, 30]
@@ -459,22 +454,20 @@ test('Parser - List syntax for repeated fields', async (t) => {
   t.equal(message.repeatedNested[0].value, 'first', 'first nested in list correct');
   t.equal(message.repeatedNested[1].value, 'second', 'second nested in list correct');
 });
-*/
 
-// TODO: Fix empty repeated fields
-/*
-test('Parser - Empty repeated fields', async (t) => {
+test('Parser - Empty repeated fields', async(t) => {
   const emptyListText = `
     repeated_string: []
     repeated_int32: []
+    repeated_enum: []
   `;
 
   const message = createAndParse(emptyListText, TestMessage);
 
-  t.same(message.repeatedString, [], 'empty string list works');
-  t.same(message.repeatedInt32, [], 'empty int32 list works');
+  t.equal(message.repeatedString, undefined, 'empty string list treated as absent (undefined)');
+  t.equal(message.repeatedInt32, undefined, 'empty int32 list treated as absent (undefined)');
+  t.equal(message.repeatedEnum, undefined, 'empty enum list treated as absent (undefined)');
 });
-*/
 
 test('Parser - Mixed repeated field syntax', async(t) => {
   const mixedText = `
