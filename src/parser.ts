@@ -336,6 +336,32 @@ class Tokenizer {
     this.nextToken();
     return result;
   }
+
+  public tryConsumeAnyScalar(): boolean {
+    if (this.atEnd()) {
+      return false;
+    }
+
+    const token = this.token;
+
+    // Try to consume string (starts with quote)
+    if (token.length > 0 && _QUOTES.has(token[0])) {
+      try {
+        this.consumeString();
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    // Try to consume identifier/number/bool
+    if (/^[a-zA-Z_][0-9a-zA-Z_+-]*$/.test(token) || /^([0-9+-]|(\.[0-9]))[0-9a-zA-Z_.+-]*$/.test(token)) {
+      this.nextToken();
+      return true;
+    }
+
+    return false;
+  }
 }
 
 function cUnescape(source: string): string {
@@ -529,7 +555,7 @@ class Parser {
 
     if (!field) {
       if (this.allowUnknownField) {
-        this.skipField(tokenizer);
+        this.skipFieldContents(tokenizer);
         return;
       }
       throw tokenizer.parseErrorPreviousToken(`Message type "${messageDescriptor.fullName}" has no field named "${fieldName}".`);
@@ -815,17 +841,70 @@ class Parser {
   }
 
   private skipField(tokenizer: Tokenizer): void {
-    if (tokenizer.tryConsume(':')) {
-      // Scalar value
+    // Consume field name (including extension syntax)
+    if (tokenizer.tryConsume('[')) {
+      // Extension field
+      tokenizer.consumeIdentifier();
+      while (tokenizer.tryConsume('.')) {
+        tokenizer.consumeIdentifier();
+      }
+      tokenizer.consume(']');
+    } else {
       tokenizer.consumeIdentifierOrNumber();
+    }
+
+    this.skipFieldContents(tokenizer);
+
+    // Optional comma or semicolon separator
+    if (!tokenizer.tryConsume(',')) {
+      tokenizer.tryConsume(';');
+    }
+  }
+
+  private skipFieldContents(tokenizer: Tokenizer): void {
+    // Try to determine if this is a scalar field or message field
+    if (tokenizer.tryConsume(':') && !tokenizer.lookingAt('{') && !tokenizer.lookingAt('<')) {
+      // Scalar value or repeated field
+      if (tokenizer.lookingAt('[')) {
+        this.skipRepeatedFieldValue(tokenizer);
+      } else {
+        this.skipFieldValue(tokenizer);
+      }
     } else {
       // Message value
-      const endToken = tokenizer.tryConsume('<') ? '>' : (tokenizer.consume('{'), '}');
-      while (!tokenizer.tryConsume(endToken)) {
-        if (tokenizer.atEnd()) {
-          throw tokenizer.parseError(`Expected "${endToken}"`);
+      this.skipFieldMessage(tokenizer);
+    }
+  }
+
+  private skipFieldMessage(tokenizer: Tokenizer): void {
+    const delimiter = tokenizer.tryConsume('<') ? '>' : (tokenizer.consume('{'), '}');
+    
+    while (!tokenizer.lookingAt('>') && !tokenizer.lookingAt('}')) {
+      this.skipField(tokenizer);
+    }
+    
+    tokenizer.consume(delimiter);
+  }
+
+  private skipFieldValue(tokenizer: Tokenizer): void {
+    if (!tokenizer.tryConsumeAnyScalar()) {
+      throw tokenizer.parseError(`Invalid field value: ${tokenizer.token}`);
+    }
+  }
+
+  private skipRepeatedFieldValue(tokenizer: Tokenizer): void {
+    tokenizer.consume('[');
+    if (!tokenizer.tryConsume(']')) {
+      while (true) {
+        if (tokenizer.lookingAt('<') || tokenizer.lookingAt('{')) {
+          this.skipFieldMessage(tokenizer);
+        } else {
+          this.skipFieldValue(tokenizer);
         }
-        this.skipField(tokenizer);
+        if (tokenizer.tryConsume(']')) {
+          break;
+        }
+        tokenizer.consume(',');
       }
     }
   }

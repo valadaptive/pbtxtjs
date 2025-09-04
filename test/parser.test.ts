@@ -508,9 +508,7 @@ test('Parser - Extension fields', async (t) => {
 });
 */
 
-// TODO: Fix parser options
-/*
-test('Parser - Parser options', async (t) => {
+test('Parser - Parser options', async(t) => {
   // Test allowUnknownField option
   const unknownFieldText = 'unknown_field: "value"\nstring_field: "known"';
 
@@ -534,8 +532,75 @@ test('Parser - Parser options', async (t) => {
     const message = createAndParse(fieldNumberText, TestMessage, {allowFieldNumber: true});
     t.equal(message.stringField, 'value by number', 'field number works when allowed');
   }, 'does not throw error for field number when allowed');
+
+  // Test allowUnknownField with message values
+  const unknownMessageText = 'unknown_message { nested_field: "value" }\nstring_field: "known"';
+
+  t.throws(() => {
+    createAndParse(unknownMessageText, TestMessage, {allowUnknownField: false});
+  }, ParseError, 'throws error for unknown message field when not allowed');
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(unknownMessageText, TestMessage, {allowUnknownField: true});
+    t.equal(message.stringField, 'known', 'known field still parsed with unknown message field allowed');
+  }, 'does not throw error for unknown message field when allowed');
+
+  // Test allowUnknownField with angle bracket message syntax
+  const unknownAngleBracketText = 'unknown_message < nested_field: "value" >\nstring_field: "known"';
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(unknownAngleBracketText, TestMessage, {allowUnknownField: true});
+    t.equal(message.stringField, 'known', 'known field still parsed with unknown angle bracket message field allowed');
+  }, 'does not throw error for unknown angle bracket message field when allowed');
+
+  // Test skipRepeatedFieldValue with scalar values
+  const unknownRepeatedScalarText = 'unknown_repeated: ["value1", "value2", "value3"]\nstring_field: "known"';
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(unknownRepeatedScalarText, TestMessage, {allowUnknownField: true});
+    t.equal(message.stringField, 'known', 'known field still parsed with unknown repeated scalar field allowed');
+  }, 'does not throw error for unknown repeated scalar field when allowed');
+
+  // Test skipRepeatedFieldValue with message values
+  const unknownRepeatedMessageText = 'unknown_repeated: [{field1: "val1"}, {field2: "val2"}]\nstring_field: "known"';
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(unknownRepeatedMessageText, TestMessage, {allowUnknownField: true});
+    t.equal(message.stringField, 'known', 'known field still parsed with unknown repeated message field allowed');
+  }, 'does not throw error for unknown repeated message field when allowed');
+
+  // Test skipRepeatedFieldValue with mixed message syntax (angle brackets)
+  const unknownRepeatedAngleBracketText =
+    'unknown_repeated: [<field1: "val1">, <field2: "val2">]\nstring_field: "known"';
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(unknownRepeatedAngleBracketText, TestMessage, {allowUnknownField: true});
+    t.equal(message.stringField, 'known', 'known field still parsed with unknown repeated angle bracket field allowed');
+  }, 'does not throw error for unknown repeated angle bracket field when allowed');
+
+  // Test skipRepeatedFieldValue with empty list
+  const unknownEmptyRepeatedText = 'unknown_repeated: []\nstring_field: "known"';
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(unknownEmptyRepeatedText, TestMessage, {allowUnknownField: true});
+    t.equal(message.stringField, 'known', 'known field still parsed with unknown empty repeated field allowed');
+  }, 'does not throw error for unknown empty repeated field when allowed');
+
+  // Test skipFieldValue with different scalar types
+  const unknownDifferentScalarsText = 'unknown_int: 42\nunknown_float: 3.14\nunknown_bool: true\nstring_field: "known"';
+
+  t.doesNotThrow(() => {
+    const message = createAndParse(unknownDifferentScalarsText, TestMessage, {allowUnknownField: true});
+    t.equal(message.stringField, 'known', 'known field still parsed with unknown different scalar types allowed');
+  }, 'does not throw error for unknown different scalar types when allowed');
+
+  // Test skipFieldValue error path with invalid field value (unrecognized token after colon)
+  const unknownInvalidValueText = 'unknown_field: }\nstring_field: "known"';
+
+  t.throws(() => {
+    createAndParse(unknownInvalidValueText, TestMessage, {allowUnknownField: true});
+  }, ParseError, 'throws error for unknown field with invalid scalar value token');
 });
-*/
 
 test('Parser - Error handling', async(t) => {
   // Test various error conditions
