@@ -1,0 +1,16 @@
+# Error cases for testing error handling
+
+# Missing colon for scalar field
+# string_field "invalid"
+
+# Invalid escape sequence
+# string_field: "\z"
+
+# Invalid number
+# int32_field: "not_a_number"
+
+# Unknown field (when allowUnknownField is false)
+# unknown_field: "value"
+
+# Invalid enum value
+# enum_field: INVALID_ENUM_VALUE

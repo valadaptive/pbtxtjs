@@ -1,0 +1,9 @@
+# String escape sequences test
+string_field: "line1\nline2"
+bytes_field: "\x41\x42\x43"  # ABC
+string_field: "tab\there"
+bytes_field: "\101\102\103"  # octal ABC
+string_field: "quote: \"test\""
+bytes_field: "\u0041\u0042\u0043"  # unicode ABC
+string_field: "backslash: \\"
+bytes_field: "\U00010000"  # unicode beyond BMP

@@ -1,0 +1,21 @@
+# Nested messages test
+nested_message {
+  value: "nested value"
+  number: 123
+}
+
+repeated_nested {
+  value: "first nested"
+  number: 1
+}
+
+repeated_nested {
+  value: "second nested"
+  number: 2
+}
+
+# Alternative angle bracket syntax
+nested_message <
+  value: "angle bracket syntax"
+  number: 456
+>

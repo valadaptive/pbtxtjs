@@ -1,0 +1,64 @@
+syntax = "proto2";
+
+package test;
+
+enum TestEnum {
+  ENUM_VALUE_ZERO = 0;
+  ENUM_VALUE_ONE = 1;
+  ENUM_VALUE_TWO = 2;
+  NEGATIVE_VALUE = -1;
+}
+
+message NestedMessage {
+  optional string value = 1;
+  optional int32 number = 2;
+}
+
+message TestMessage {
+  // Scalar fields
+  optional string string_field = 1;
+  optional bytes bytes_field = 2;
+  optional int32 int32_field = 3;
+  optional int64 int64_field = 4;
+  optional uint32 uint32_field = 5;
+  optional uint64 uint64_field = 6;
+  optional sint32 sint32_field = 7;
+  optional sint64 sint64_field = 8;
+  optional fixed32 fixed32_field = 9;
+  optional fixed64 fixed64_field = 10;
+  optional sfixed32 sfixed32_field = 11;
+  optional sfixed64 sfixed64_field = 12;
+  optional float float_field = 13;
+  optional double double_field = 14;
+  optional bool bool_field = 15;
+  optional TestEnum enum_field = 16;
+
+  // Repeated fields
+  repeated string repeated_string = 17;
+  repeated int32 repeated_int32 = 18;
+  repeated TestEnum repeated_enum = 19;
+
+  // Nested message
+  optional NestedMessage nested_message = 20;
+  repeated NestedMessage repeated_nested = 21;
+
+  // Map fields
+  map<string, int32> string_int_map = 22;
+  map<int32, NestedMessage> int_message_map = 23;
+
+  // Group field (deprecated but should be supported)
+  optional group TestGroup = 24 {
+    optional string group_value = 1;
+  }
+}
+
+message MapTestMessage {
+  map<string, string> string_map = 1;
+  map<int32, int32> int_map = 2;
+  map<string, NestedMessage> message_map = 3;
+}
+
+extend TestMessage {
+  optional string ext_string = 100;
+  optional int32 ext_int = 101;
+}

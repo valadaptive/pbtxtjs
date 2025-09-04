@@ -1,0 +1,9 @@
+# Enum values test
+enum_field: ENUM_VALUE_ZERO
+enum_field: ENUM_VALUE_ONE
+enum_field: ENUM_VALUE_TWO
+enum_field: 0              # numeric value
+enum_field: 1              # numeric value
+enum_field: 2              # numeric value
+enum_field: NEGATIVE_VALUE
+enum_field: -1             # negative numeric value

@@ -1,0 +1,12 @@
+# Comments and whitespace test
+# This is a comment
+string_field: "test"  # inline comment
+
+# Multiple whitespace and tabs
+	int32_field: 	42
+
+# Empty lines are allowed
+
+float_field: 3.14
+
+# Comment at end

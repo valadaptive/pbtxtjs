@@ -1,0 +1,17 @@
+# Basic scalar fields test
+string_field: "hello world"
+bytes_field: "binary\x00\x01\x02data"
+int32_field: 42
+int64_field: 9223372036854775807
+uint32_field: 4294967295
+uint64_field: 18446744073709551615
+sint32_field: -2147483648
+sint64_field: -9223372036854775808
+fixed32_field: 42
+fixed64_field: 42
+sfixed32_field: -42
+sfixed64_field: -42
+float_field: 3.14159
+double_field: 3.141592653589793
+bool_field: true
+enum_field: ENUM_VALUE_ONE

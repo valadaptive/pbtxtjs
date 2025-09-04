@@ -1,0 +1,11 @@
+# Repeated fields test
+repeated_string: "first"
+repeated_string: "second"
+repeated_string: "third"
+
+repeated_int32: 1
+repeated_int32: 2
+repeated_int32: 3
+
+# List syntax for repeated fields
+repeated_enum: [ENUM_VALUE_ZERO, ENUM_VALUE_ONE, ENUM_VALUE_TWO]

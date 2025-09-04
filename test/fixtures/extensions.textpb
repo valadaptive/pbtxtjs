@@ -1,0 +1,4 @@
+# Extension fields test
+string_field: "base message"
+[test.ext_string]: "extension string"
+[test.ext_int]: 12345

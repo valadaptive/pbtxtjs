@@ -1,0 +1,9 @@
+# Boolean values test
+bool_field: true
+bool_field: false
+bool_field: t
+bool_field: f
+bool_field: 1
+bool_field: 0
+bool_field: True
+bool_field: False

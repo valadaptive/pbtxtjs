@@ -1,0 +1,16 @@
+# Numeric formats test
+int32_field: 42        # decimal
+int32_field: 052       # octal
+int32_field: 0x2A      # hexadecimal
+int32_field: -42       # negative
+
+float_field: 3.14
+float_field: 3.14f     # with f suffix
+float_field: 3.14F     # with F suffix
+float_field: 1e10      # scientific notation
+float_field: 1.5e-10   # negative exponent
+float_field: inf       # infinity
+float_field: -inf      # negative infinity
+float_field: nan       # not a number
+
+double_field: 2.71828182845904523536
