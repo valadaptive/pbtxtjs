@@ -294,7 +294,10 @@ class Tokenizer {
   }
 
   public consumeByteString(): Uint8Array {
-    const text = this._consumeByteString();
+    let text = this._consumeByteString();
+    while (this.token && _QUOTES.has(this.token[0])) {
+      text += this._consumeByteString();
+    }
     const dest = new Uint8Array(text.length);
     for (let i = 0; i < text.length; i++) {
       dest[i] = text.charCodeAt(i);
