@@ -149,35 +149,85 @@ class Tokenizer {
     return new ParseError(message, this._previous_line + 1, this._previous_column + 1);
   }
 
+  /**
+   * Parses an integer with automatic base detection (decimal, octal, hex).
+   * Based on the protobuf text format specification.
+   * @param text The text to parse
+   * @param constructor Either Number or BigInt constructor
+   * @returns The parsed value using the specified constructor
+   */
+  private parseInteger<T extends number | bigint>(
+    text: string,
+    constructor: (value: string | number) => T,
+  ): T {
+    const originalText = text;
+
+    // Handle different number formats according to protobuf spec:
+    // OCT_INT = "0", oct, { oct } - C-style octal like 052
+    // HEX_INT = "0", ( "X" | "x" ), hex, { hex } - hex like 0x2A
+    // DEC_INT = decimal numbers
+
+    try {
+      let result: T;
+
+      if (text.startsWith('0x') || text.startsWith('0X')) {
+        // Hexadecimal: 0x2A, 0X2A
+        result = constructor(text);
+      } else if (text.startsWith('-0x') || text.startsWith('-0X')) {
+        // Negative hexadecimal: -0x2A, -0X2A
+        // Handle manually since Number("-0x2A") returns NaN
+        const hexValue = parseInt(text, 16);
+        result = constructor(hexValue);
+      } else if (/^-?0[0-7]+$/.test(text)) {
+        // C-style octal: 052, -052 (starts with 0, followed by octal digits)
+        const octalValue = parseInt(text, 8);
+        result = constructor(octalValue);
+      } else {
+        // Decimal: 42, -42
+        result = constructor(text);
+      }
+
+      // Check for NaN when using Number constructor
+      if (typeof result === 'number' && isNaN(result)) {
+        throw new Error(`NaN result`);
+      }
+
+      return result;
+    } catch {
+      throw new Error(`Couldn't parse integer: ${originalText}`);
+    }
+  }
+
   public consumeInt32(): number {
     const int_str = this.token;
     this.nextToken();
-    const value = parseInt(int_str, 10);
-    if (isNaN(value)) {
+    try {
+      const value = this.parseInteger(int_str, Number);
+      // TODO: Add range check for int32
+      return value;
+    } catch {
       throw this.parseErrorPreviousToken(`Couldn't parse integer: ${int_str}`);
     }
-    // TODO: Add range check for int32
-    return value;
   }
 
   public consumeUint32(): number {
     const int_str = this.token;
     this.nextToken();
-    const value = parseInt(int_str, 10);
-    if (isNaN(value)) {
+    try {
+      const value = this.parseInteger(int_str, Number);
+      // TODO: Add range check for uint32
+      return value;
+    } catch {
       throw this.parseErrorPreviousToken(`Couldn't parse integer: ${int_str}`);
     }
-    // TODO: Add range check for uint32
-    return value;
   }
 
   public consumeInt64(): bigint {
     const int_str = this.token;
     this.nextToken();
     try {
-      return BigInt(int_str);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch(_e) {
+      return this.parseInteger(int_str, BigInt);
+    } catch {
       throw this.parseErrorPreviousToken(`Couldn't parse integer: ${int_str}`);
     }
   }
@@ -186,9 +236,8 @@ class Tokenizer {
     const int_str = this.token;
     this.nextToken();
     try {
-      return BigInt(int_str);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch(_e) {
+      return this.parseInteger(int_str, BigInt);
+    } catch {
       throw this.parseErrorPreviousToken(`Couldn't parse integer: ${int_str}`);
     }
   }
@@ -196,6 +245,20 @@ class Tokenizer {
   public consumeFloat(): number {
     const float_str = this.token;
     this.nextToken();
+
+    // Handle special identifiers according to protobuf spec (case-insensitive)
+    const lowerToken = float_str.toLowerCase();
+    if (lowerToken === 'inf' || lowerToken === 'infinity') {
+      return Infinity;
+    }
+    if (lowerToken === '-inf' || lowerToken === '-infinity') {
+      return -Infinity;
+    }
+    if (lowerToken === 'nan') {
+      return NaN;
+    }
+
+    // Handle regular numeric values
     // TODO: A more robust float parsing like in Python version
     if (float_str.endsWith('f')) {
       return parseFloat(float_str.slice(0, -1));
@@ -208,15 +271,17 @@ class Tokenizer {
     this.nextToken();
     switch (bool_str) {
       case 'true':
+      case 'True':
       case 't':
       case '1':
         return true;
       case 'false':
+      case 'False':
       case 'f':
       case '0':
         return false;
       default:
-        throw this.parseErrorPreviousToken(`Expected "true" or "false", found "${bool_str}"`);
+        throw this.parseErrorPreviousToken(`Expected "true", "True", "t", 1, or "false", "False", "f", 0; found "${bool_str}"`);
     }
   }
 

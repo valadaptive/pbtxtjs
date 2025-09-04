@@ -209,11 +209,20 @@ test('Parser - String escape sequences', async(t) => {
 test('Parser - Numeric formats', async(t) => {
   const testCases = [
     {text: 'int32_field: 42', expected: 42, description: 'decimal'},
-    // TODO: Fix octal parsing
-    // {text: 'int32_field: 052', expected: 42, description: 'octal'},
-    // TODO: Fix hexadecimal parsing
-    // {text: 'int32_field: 0x2A', expected: 42, description: 'hexadecimal'},
+    {text: 'int32_field: 052', expected: 42, description: 'octal'},
+    {text: 'int32_field: 0x2A', expected: 42, description: 'hexadecimal'},
     {text: 'int32_field: -42', expected: -42, description: 'negative'},
+
+    // Test negative hex and octal specifically (these have special handling)
+    {text: 'int32_field: -052', expected: -42, description: 'negative octal'},
+    {text: 'int32_field: -0x2A', expected: -42, description: 'negative hexadecimal'},
+    {text: 'int32_field: -0X2A', expected: -42, description: 'negative hexadecimal uppercase'},
+
+    // Test edge cases
+    {text: 'int32_field: 0x0', expected: 0, description: 'hex zero'},
+    {text: 'int32_field: -0x0', expected: 0, description: 'negative hex zero'},
+    {text: 'int32_field: 00', expected: 0, description: 'octal zero'},
+    {text: 'int32_field: -00', expected: 0, description: 'negative octal zero'},
   ];
 
   for (const testCase of testCases) {
@@ -236,23 +245,55 @@ test('Parser - Numeric formats', async(t) => {
       `float format ${testCase.text} works`);
   }
 
-  // TODO: Fix special float values (inf, -inf, nan)
-  /*
-  // Test special float values
-  const message1 = createAndParse('float_field: inf', TestMessage);
-  t.equal(message1.floatField, Infinity, 'infinity value works');
+  // Test special float values according to protobuf spec
+  // The spec supports "inf", "infinity", and "nan" (case-insensitive)
+  const specialFloatTests = [
+    // Infinity variants (case-insensitive)
+    {text: 'float_field: inf', expected: Infinity, description: 'inf (lowercase)'},
+    {text: 'float_field: Inf', expected: Infinity, description: 'Inf (capitalized)'},
+    {text: 'float_field: INF', expected: Infinity, description: 'INF (uppercase)'},
+    {text: 'float_field: infinity', expected: Infinity, description: 'infinity (lowercase)'},
+    {text: 'float_field: Infinity', expected: Infinity, description: 'Infinity (capitalized)'},
+    {text: 'float_field: INFINITY', expected: Infinity, description: 'INFINITY (uppercase)'},
 
-  const message2 = createAndParse('float_field: -inf', TestMessage);
-  t.equal(message2.floatField, -Infinity, 'negative infinity value works');
+    // Negative infinity variants
+    {text: 'float_field: -inf', expected: -Infinity, description: '-inf (lowercase)'},
+    {text: 'float_field: -Inf', expected: -Infinity, description: '-Inf (capitalized)'},
+    {text: 'float_field: -INF', expected: -Infinity, description: '-INF (uppercase)'},
+    {text: 'float_field: -infinity', expected: -Infinity, description: '-infinity (lowercase)'},
+    {text: 'float_field: -Infinity', expected: -Infinity, description: '-Infinity (capitalized)'},
+    {text: 'float_field: -INFINITY', expected: -Infinity, description: '-INFINITY (uppercase)'},
 
-  const message3 = createAndParse('float_field: nan', TestMessage);
-  t.ok(isNaN(message3.floatField), 'NaN value works');
-  */
+    // NaN variants (case-insensitive)
+    {text: 'float_field: nan', expected: NaN, description: 'nan (lowercase)'},
+    {text: 'float_field: Nan', expected: NaN, description: 'Nan (capitalized)'},
+    {text: 'float_field: NaN', expected: NaN, description: 'NaN (mixed case)'},
+    {text: 'float_field: NAN', expected: NaN, description: 'NAN (uppercase)'},
+  ];
+
+  for (const testCase of specialFloatTests) {
+    const message = createAndParse(testCase.text, TestMessage);
+    if (isNaN(testCase.expected)) {
+      t.ok(isNaN(message.floatField), `${testCase.description} produces NaN`);
+    } else {
+      t.equal(message.floatField, testCase.expected, `${testCase.description} works`);
+    }
+  }
+
+  // Test the same special values work for double fields
+  const message1 = createAndParse('double_field: inf', TestMessage);
+  t.equal(message1.doubleField, Infinity, 'inf works for double field');
+
+  const message2 = createAndParse('double_field: -infinity', TestMessage);
+  t.equal(message2.doubleField, -Infinity, '-infinity works for double field');
+
+  const message3 = createAndParse('double_field: NaN', TestMessage);
+  t.ok(isNaN(message3.doubleField), 'NaN works for double field');
 });
 
 test('Parser - Boolean values', async(t) => {
-  const trueValues = ['true', 't', '1'/*, 'True'*/]; // TODO: Fix case-insensitive True
-  const falseValues = ['false', 'f', '0'/*, 'False'*/]; // TODO: Fix case-insensitive False
+  const trueValues = ['true', 't', '1', 'True']; // Valid true values
+  const falseValues = ['false', 'f', '0', 'False']; // Valid false values
 
   for (const value of trueValues) {
     const message = createAndParse(`bool_field: ${value}`, TestMessage);
@@ -262,6 +303,30 @@ test('Parser - Boolean values', async(t) => {
   for (const value of falseValues) {
     const message = createAndParse(`bool_field: ${value}`, TestMessage);
     t.equal(message.boolField, false, `${value} parses as false`);
+  }
+});
+
+test('Parser - Boolean capitalization rules', async(t) => {
+  // Test that only first-letter capitalization is allowed (True/False)
+  // but not full uppercase or mixed case variations
+
+  const invalidBooleans = [
+    'TRUE',    // All uppercase - should fail
+    'tRue',    // Mixed case - should fail
+    'truE',    // Mixed case - should fail
+    'TRue',    // Mixed case - should fail
+    'tRUE',    // Mixed case - should fail
+    'FALSE',   // All uppercase - should fail
+    'fAlse',   // Mixed case - should fail
+    'falsE',   // Mixed case - should fail
+    'FAlse',   // Mixed case - should fail
+    'fALSE',   // Mixed case - should fail
+  ];
+
+  for (const invalidValue of invalidBooleans) {
+    t.throws(() => {
+      createAndParse(`bool_field: ${invalidValue}`, TestMessage);
+    }, ParseError, `${invalidValue} should be rejected as invalid boolean`);
   }
 });
 
@@ -507,6 +572,22 @@ test('Parser - Large numbers', async(t) => {
       testCase.text.includes('uint64') ? 'uint64Field' :
         testCase.text.includes('int32') ? 'int32Field' : 'uint32Field';
     t.equal(message[field], testCase.expected, `${testCase.description} works`);
+  }
+});
+
+test('Parser - Negative hex and octal with 64-bit integers', async(t) => {
+  // Test that negative hex and octal work correctly with BigInt
+  const int64NegativeTests = [
+    {text: 'int64_field: -0x1A', expected: -26n, description: 'negative hex int64'},
+    {text: 'int64_field: -0X1A', expected: -26n, description: 'negative hex uppercase int64'},
+    {text: 'int64_field: -032', expected: -26n, description: 'negative octal int64'},
+    {text: 'int64_field: -0x0', expected: 0n, description: 'negative hex zero int64'},
+    {text: 'int64_field: -00', expected: 0n, description: 'negative octal zero int64'},
+  ];
+
+  for (const testCase of int64NegativeTests) {
+    const message = createAndParse(testCase.text, TestMessage);
+    t.equal(message.int64Field, testCase.expected, `${testCase.description} works`);
   }
 });
 
