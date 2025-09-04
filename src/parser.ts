@@ -28,6 +28,7 @@ const _QUOTES = new Set(["'", '"']);
  *
  ** It was directly ported from the Java protocol buffer API^H^H^H^Hthe Python implementation. Thanks Gemini.
  */
+
 class Tokenizer {
   private _lines: string[];
   private _line = -1;
@@ -156,7 +157,7 @@ class Tokenizer {
    * @param constructor Either Number or BigInt constructor
    * @returns The parsed value using the specified constructor
    */
-  private parseInteger<T extends number | bigint>(
+  static parseInteger<T extends number | bigint>(
     text: string,
     constructor: (value: string | number) => T,
   ): T {
@@ -202,7 +203,7 @@ class Tokenizer {
     const int_str = this.token;
     this.nextToken();
     try {
-      const value = this.parseInteger(int_str, Number);
+      const value = Tokenizer.parseInteger(int_str, Number);
       // TODO: Add range check for int32
       return value;
     } catch {
@@ -214,7 +215,7 @@ class Tokenizer {
     const int_str = this.token;
     this.nextToken();
     try {
-      const value = this.parseInteger(int_str, Number);
+      const value = Tokenizer.parseInteger(int_str, Number);
       // TODO: Add range check for uint32
       return value;
     } catch {
@@ -226,7 +227,7 @@ class Tokenizer {
     const int_str = this.token;
     this.nextToken();
     try {
-      return this.parseInteger(int_str, BigInt);
+      return Tokenizer.parseInteger(int_str, BigInt);
     } catch {
       throw this.parseErrorPreviousToken(`Couldn't parse integer: ${int_str}`);
     }
@@ -236,7 +237,7 @@ class Tokenizer {
     const int_str = this.token;
     this.nextToken();
     try {
-      return this.parseInteger(int_str, BigInt);
+      return Tokenizer.parseInteger(int_str, BigInt);
     } catch {
       throw this.parseErrorPreviousToken(`Couldn't parse integer: ${int_str}`);
     }
@@ -625,16 +626,21 @@ class Parser {
 
   private parseEnum(field: protobuf.Field, value: string): number {
     const enumType = field.resolvedType as protobuf.Enum;
-    // try as number first
-    if (/^-?\d+$/.test(value)) {
-      const num = parseInt(value, 10);
-      if (Object.prototype.hasOwnProperty.call(enumType.valuesById, num)) {
+    // try as number first (decimal, hex, or octal)
+    if (/^-?(?:0[xX][0-9a-fA-F]+|0[0-7]+|\d+)$/.test(value)) {
+      try {
+        const num = Tokenizer.parseInteger(value, Number);
+
+        if (Object.prototype.hasOwnProperty.call(enumType.valuesById, num)) {
+          return num;
+        }
+        // It's a number, but not a valid enum value.
+        // The Python parser would raise an error here for closed enums.
+        // For now, we'll allow it, which is the default for proto3.
         return num;
+      } catch {
+        // If parsing as integer fails, fall through to string parsing
       }
-      // It's a number, but not a valid enum value.
-      // The Python parser would raise an error here for closed enums.
-      // For now, we'll allow it, which is the default for proto3.
-      return num;
     }
 
     // try as string
@@ -650,7 +656,14 @@ class Parser {
 
     // Use duck-typing to check for an enum. An Enum object has `valuesById`.
     if (field.resolvedType && ('valuesById' in field.resolvedType)) {
-      const enumValueStr = tokenizer.consumeIdentifierOrNumber();
+      let enumValueStr: string;
+      // Check if it's a number in any format (decimal, hex, octal, including negative)
+      if (/^-?(?:0[xX][0-9a-fA-F]+|0[0-7]+|\d+)$/.test(tokenizer.token)) {
+        enumValueStr = tokenizer.token;
+        tokenizer.nextToken();
+      } else {
+        enumValueStr = tokenizer.consumeIdentifierOrNumber();
+      }
       value = this.parseEnum(field, enumValueStr);
     } else {
       value = this.parseScalar(tokenizer, field.type);

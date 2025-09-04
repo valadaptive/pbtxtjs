@@ -339,8 +339,7 @@ test('Parser - Enum values', async(t) => {
     {text: 'enum_field: 1', expected: TestEnum.values.ENUM_VALUE_ONE},
     {text: 'enum_field: 2', expected: TestEnum.values.ENUM_VALUE_TWO},
     {text: 'enum_field: NEGATIVE_VALUE', expected: TestEnum.values.NEGATIVE_VALUE},
-    // TODO: Fix negative number parsing for enums
-    // {text: 'enum_field: -1', expected: TestEnum.values.NEGATIVE_VALUE},
+    {text: 'enum_field: -1', expected: TestEnum.values.NEGATIVE_VALUE},
   ];
 
   for (const testCase of testCases) {
@@ -562,19 +561,15 @@ test('Parser - Large numbers', async(t) => {
   const largeNumberTests = [
     {text: 'int64_field: 9223372036854775807', expected: 9223372036854775807n, description: 'max int64'},
     {text: 'int64_field: -9223372036854775808', expected: -9223372036854775808n, description: 'min int64'},
-    // TODO: Fix uint64 field access
-    // {text: 'uint64_field: 18446744073709551615', expected: 18446744073709551615n, description: 'max uint64'},
+    {text: 'uint64_field: 18446744073709551615', expected: 18446744073709551615n, description: 'max uint64'},
     {text: 'int32_field: 2147483647', expected: 2147483647, description: 'max int32'},
     {text: 'int32_field: -2147483648', expected: -2147483648, description: 'min int32'},
-    // TODO: Fix uint32 field access
-    // {text: 'uint32_field: 4294967295', expected: 4294967295, description: 'max uint32'},
+    {text: 'uint32_field: 4294967295', expected: 4294967295, description: 'max uint32'},
   ];
 
   for (const testCase of largeNumberTests) {
     const message = createAndParse(testCase.text, TestMessage);
-    const field = testCase.text.includes('int64') ? 'int64Field' :
-      testCase.text.includes('uint64') ? 'uint64Field' :
-        testCase.text.includes('int32') ? 'int32Field' : 'uint32Field';
+    const field = testCase.text.match(/[^_]+/)![0] + 'Field';
     t.equal(message[field], testCase.expected, `${testCase.description} works`);
   }
 });
