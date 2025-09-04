@@ -474,13 +474,6 @@ function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
 }
 
-function toPascalCase(str: string): string {
-  return str
-    .split('_')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-}
-
 class Parser {
   private readonly allowUnknownExtension: boolean;
   private readonly allowFieldNumber: boolean;
@@ -602,10 +595,10 @@ class Parser {
           }
 
           this.parseList(tokenizer, message, field, () => {
-            this.mergeMessageField(tokenizer, message, field, false);
+            this.mergeMessageField(tokenizer, message, field);
           });
         } else {
-          this.mergeMessageField(tokenizer, message, field, false);
+          this.mergeMessageField(tokenizer, message, field);
         }
       }
     } else { // Scalar
@@ -802,16 +795,11 @@ class Parser {
     tokenizer: Tokenizer,
     message: T,
     field: protobuf.Field,
-    isMapEntry: boolean,
   ): void {
     const endToken = tokenizer.tryConsume('<') ? '>' : (tokenizer.consume('{'), '}');
 
     let subMessage: protobuf.Message;
-    if (isMapEntry) {
-      const mapEntryTypeName = toPascalCase(field.name) + 'Entry';
-      const mapEntryType = field.root.lookupType(mapEntryTypeName);
-      subMessage = mapEntryType.create();
-    } else if (field.repeated) {
+    if (field.repeated) {
       subMessage = (field.resolvedType as protobuf.Type).create();
       if (!Array.isArray((message as any)[field.name])) {
         (message as any)[field.name] = [];
@@ -827,16 +815,6 @@ class Parser {
         throw tokenizer.parseError(`Expected "${endToken}"`);
       }
       this.mergeField(tokenizer, subMessage);
-    }
-
-    if (isMapEntry) {
-      const key = (subMessage as any)['key'];
-      const value = (subMessage as any)['value'];
-
-      if (!(message as any)[field.name]) {
-        (message as any)[field.name] = {};
-      }
-      (message as any)[field.name][key] = value;
     }
   }
 
