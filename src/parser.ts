@@ -856,11 +856,11 @@ class Parser {
 
   private skipFieldMessage(tokenizer: Tokenizer): void {
     const delimiter = tokenizer.tryConsume('<') ? '>' : (tokenizer.consume('{'), '}');
-    
+
     while (!tokenizer.lookingAt('>') && !tokenizer.lookingAt('}')) {
       this.skipField(tokenizer);
     }
-    
+
     tokenizer.consume(delimiter);
   }
 
