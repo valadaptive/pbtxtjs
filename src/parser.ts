@@ -278,17 +278,17 @@ function cUnescape(source: string): string {
       i++;
       switch (source[i]) {
         // Simple single-character escapes
-        case 'a': result += '\x07'; break;
-        case 'b': result += '\b'; break;
-        case 'f': result += '\f'; break;
-        case 'n': result += '\n'; break;
-        case 'r': result += '\r'; break;
-        case 't': result += '\t'; break;
-        case 'v': result += '\v'; break;
-        case '?': result += '?'; break;
-        case '\\': result += '\\'; break;
-        case '\'': result += '\''; break;
-        case '"': result += '"'; break;
+        case 'a': result += '\x07'; i++; break;
+        case 'b': result += '\b'; i++; break;
+        case 'f': result += '\f'; i++; break;
+        case 'n': result += '\n'; i++; break;
+        case 'r': result += '\r'; i++; break;
+        case 't': result += '\t'; i++; break;
+        case 'v': result += '\v'; i++; break;
+        case '?': result += '?'; i++; break;
+        case '\\': result += '\\'; i++; break;
+        case '\'': result += '\''; i++; break;
+        case '"': result += '"'; i++; break;
 
         case '0':
         case '1':
@@ -331,16 +331,8 @@ function cUnescape(source: string): string {
         case 'U': {
           i++;
 
-          const isFourByte = source.slice(i, i + 4) === '0010';
-          const numDigits = isFourByte ? 4 : 5;
-          if (isFourByte) {
-            i += 4;
-          } else {
-            i += 3;
-          }
-
           let unicode = '';
-          for (let j = 0; j < numDigits; i++, j++) {
+          for (let j = 0; j < 8 && i < source.length; i++, j++) {
             unicode += source[i];
           }
           result += String.fromCodePoint(parseInt(unicode, 16));
@@ -635,7 +627,12 @@ class Parser {
     }
   }
 
-  private mergeMessageField<T extends protobuf.Message>(tokenizer: Tokenizer, message: T, field: protobuf.Field, isMapEntry: boolean): void {
+  private mergeMessageField<T extends protobuf.Message>(
+    tokenizer: Tokenizer,
+    message: T,
+    field: protobuf.Field,
+    isMapEntry: boolean,
+  ): void {
     const endToken = tokenizer.tryConsume('<') ? '>' : (tokenizer.consume('{'), '}');
 
     let subMessage: protobuf.Message;

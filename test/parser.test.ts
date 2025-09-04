@@ -52,19 +52,159 @@ test('Parser - Basic scalar fields', async(t) => {
   t.equal(message.enumField, TestEnum.values.ENUM_VALUE_ONE, 'enum field parsed correctly');
 });
 
-// TODO: Fix escape sequence parsing
-/*
-test('Parser - String escape sequences', async (t) => {
-  const text = await loadFixture('escapes.textpb');
-  const message = createAndParse(text, TestMessage);
+test('Parser - String escape sequences', async(t) => {
+  // Test simple character escapes (ASCII control characters)
+  const simpleEscapes = [
+    {text: 'string_field: "\\a"', expected: '\x07', description: 'bell character (\\a)'},
+    {text: 'string_field: "\\b"', expected: '\b', description: 'backspace (\\b)'},
+    {text: 'string_field: "\\f"', expected: '\f', description: 'form feed (\\f)'},
+    {text: 'string_field: "\\n"', expected: '\n', description: 'line feed (\\n)'},
+    {text: 'string_field: "\\r"', expected: '\r', description: 'carriage return (\\r)'},
+    {text: 'string_field: "\\t"', expected: '\t', description: 'horizontal tab (\\t)'},
+    {text: 'string_field: "\\v"', expected: '\v', description: 'vertical tab (\\v)'},
+    {text: 'string_field: "\\?"', expected: '?', description: 'question mark (\\?)'},
+    {text: 'string_field: "\\\\"', expected: '\\', description: 'backslash (\\\\)'},
+    {text: `string_field: "\\'"`, expected: "'", description: "apostrophe (\\')"},
+    {text: `string_field: "\\""`, expected: '"', description: 'quote (\\")'},
+  ];
 
-  // Note: repeated string field will have multiple values, we test the first few
-  t.ok(message.stringField.includes('\n'), 'newline escape sequence works');
-  t.ok(message.stringField.includes('\t'), 'tab escape sequence works');
-  t.ok(message.stringField.includes('"'), 'quote escape sequence works');
-  t.ok(message.stringField.includes('\\'), 'backslash escape sequence works');
+  for (const testCase of simpleEscapes) {
+    const message = createAndParse(testCase.text, TestMessage);
+    t.equal(message.stringField, testCase.expected, testCase.description);
+  }
+
+  // Test octal escape sequences
+  const octalEscapes = [
+    {text: 'string_field: "\\0"', expected: '\x00', description: 'null character (\\0)'},
+    {text: 'string_field: "\\1"', expected: '\x01', description: 'single digit octal (\\1)'},
+    {text: 'string_field: "\\12"', expected: '\x0A', description: 'two digit octal (\\12)'},
+    {text: 'string_field: "\\123"', expected: '\x53', description: 'three digit octal (\\123)'},
+    {text: 'string_field: "\\377"', expected: '\xFF', description: 'max octal value (\\377)'},
+    {text: 'string_field: "\\000"', expected: '\x00', description: 'zero padded octal (\\000)'},
+    {text: 'string_field: "\\001"', expected: '\x01', description: 'zero padded octal (\\001)'},
+    {text: 'string_field: "\\063"', expected: '\x33', description: 'zero padded octal (\\063)'},
+  ];
+
+  for (const testCase of octalEscapes) {
+    const message = createAndParse(testCase.text, TestMessage);
+    t.equal(message.stringField, testCase.expected, testCase.description);
+  }
+
+  // Test octal overflow behavior - only first 3 digits consumed
+  const octalOverflow = createAndParse('string_field: "\\1234"', TestMessage);
+  t.equal(octalOverflow.stringField, '\x534', 'octal overflow: \\1234 becomes \\123 + 4');
+
+  // Test octal with non-digit termination
+  const octalTerminated = createAndParse('string_field: "\\5Hello"', TestMessage);
+  t.equal(octalTerminated.stringField, '\x05Hello', 'octal terminated by non-digit: \\5Hello');
+
+  // Test hexadecimal escape sequences
+  const hexEscapes = [
+    {text: 'string_field: "\\x00"', expected: '\x00', description: 'null hex (\\x00)'},
+    {text: 'string_field: "\\x01"', expected: '\x01', description: 'single hex digit (\\x01)'},
+    {text: 'string_field: "\\x21"', expected: '\x21', description: 'two hex digits (\\x21)'},
+    {text: 'string_field: "\\xFF"', expected: '\xFF', description: 'uppercase hex (\\xFF)'},
+    {text: 'string_field: "\\xff"', expected: '\xFF', description: 'lowercase hex (\\xff)'},
+    {text: 'string_field: "\\xaB"', expected: '\xAB', description: 'mixed case hex (\\xaB)'},
+    {text: 'string_field: "\\xF"', expected: '\x0F', description: 'single hex digit (\\xF)'},
+  ];
+
+  for (const testCase of hexEscapes) {
+    const message = createAndParse(testCase.text, TestMessage);
+    t.equal(message.stringField, testCase.expected, testCase.description);
+  }
+
+  // Test hex overflow behavior - only first 2 digits consumed
+  const hexOverflow = createAndParse('string_field: "\\x213"', TestMessage);
+  t.equal(hexOverflow.stringField, '\x213', 'hex overflow: \\x213 becomes \\x21 + 3');
+
+  // Test hex with non-hex termination
+  const hexTerminated1 = createAndParse('string_field: "\\xFHello"', TestMessage);
+  t.equal(hexTerminated1.stringField, '\x0FHello', 'hex terminated by non-hex: \\xFHello');
+
+  const hexTerminated2 = createAndParse('string_field: "\\x3world"', TestMessage);
+  t.equal(hexTerminated2.stringField, '\x03world', 'hex terminated by non-hex: \\x3world');
+
+  // Test Unicode escape sequences (\\u)
+  const unicodeEscapes = [
+    {text: 'string_field: "\\u0000"', expected: '\u0000', description: 'null unicode (\\u0000)'},
+    {text: 'string_field: "\\u0041"', expected: '\u0041', description: 'ASCII A (\\u0041)'},
+    {text: 'string_field: "\\u0042"', expected: '\u0042', description: 'ASCII B (\\u0042)'},
+    {text: 'string_field: "\\u0043"', expected: '\u0043', description: 'ASCII C (\\u0043)'},
+    {text: 'string_field: "\\u03B1"', expected: '\u03B1', description: 'Greek alpha (\\u03B1)'},
+    {text: 'string_field: "\\u20AC"', expected: '\u20AC', description: 'Euro symbol (\\u20AC)'},
+    {text: 'string_field: "\\uffff"', expected: '\uffff', description: 'max BMP unicode (\\uffff)'},
+    {text: 'string_field: "\\uFFFF"', expected: '\uFFFF', description: 'max BMP unicode uppercase (\\uFFFF)'},
+  ];
+
+  for (const testCase of unicodeEscapes) {
+    const message = createAndParse(testCase.text, TestMessage);
+    t.equal(message.stringField, testCase.expected, testCase.description);
+  }
+
+  // Test Unicode escape sequences (\\U for code points > 0xFFFF)
+  const extendedUnicodeEscapes = [
+    {text: 'string_field: "\\U00010000"', expected: '\u{10000}', description: 'first non-BMP (\\U00010000)'},
+    {text: 'string_field: "\\U0001F600"', expected: '\u{1F600}', description: 'grinning face emoji (\\U0001F600)'},
+    {text: 'string_field: "\\U0001F4A9"', expected: '\u{1F4A9}', description: 'pile of poo emoji (\\U0001F4A9)'},
+    {text: 'string_field: "\\U00020000"', expected: '\u{20000}', description: 'CJK Extension B (\\U00020000)'},
+  ];
+
+  for (const testCase of extendedUnicodeEscapes) {
+    const message = createAndParse(testCase.text, TestMessage);
+    t.equal(message.stringField, testCase.expected, testCase.description);
+  }
+
+  // Test \\U0010xxxx format (according to spec)
+  const highUnicodeEscapes = [
+    {text: 'string_field: "\\U00100000"', expected: '\u{100000}', description: 'high unicode (\\U00100000)'},
+    {text: 'string_field: "\\U0010FFFF"', expected: '\u{10FFFF}', description: 'max unicode (\\U0010FFFF)'},
+  ];
+
+  for (const testCase of highUnicodeEscapes) {
+    const message = createAndParse(testCase.text, TestMessage);
+    t.equal(message.stringField, testCase.expected, testCase.description);
+  }
+
+  // Test combinations of escapes in one string
+  const combined1 = createAndParse('string_field: "Hello\\nWorld\\t!"', TestMessage);
+  t.equal(combined1.stringField, 'Hello\nWorld\t!', 'combined escapes: newline and tab');
+
+  const combined2 = createAndParse('string_field: "Quote: \\"text\\""', TestMessage);
+  t.equal(combined2.stringField, 'Quote: "text"', 'combined escapes: quotes');
+
+  const combined3 = createAndParse('string_field: "\\x41\\x42\\x43"', TestMessage);
+  t.equal(combined3.stringField, 'ABC', 'combined hex escapes');
+
+  const combined4 = createAndParse('string_field: "\\u0041\\u0042\\u0043"', TestMessage);
+  t.equal(combined4.stringField, 'ABC', 'combined unicode escapes');
+
+  // Test escape sequences in bytes fields
+  const bytesEscape1 = createAndParse('bytes_field: "\\x00\\x01\\x02"', TestMessage);
+  t.equal(bytesEscape1.bytesField[0], 0x00, 'bytes field escape: first byte');
+  t.equal(bytesEscape1.bytesField[1], 0x01, 'bytes field escape: second byte');
+  t.equal(bytesEscape1.bytesField[2], 0x02, 'bytes field escape: third byte');
+
+  const bytesEscape2 = createAndParse('bytes_field: "\\377\\376\\375"', TestMessage);
+  t.equal(bytesEscape2.bytesField[0], 0xFF, 'bytes field octal escape: first byte');
+  t.equal(bytesEscape2.bytesField[1], 0xFE, 'bytes field octal escape: second byte');
+  t.equal(bytesEscape2.bytesField[2], 0xFD, 'bytes field octal escape: third byte');
+
+  // Test both single and double quote strings
+  const singleQuotes = createAndParse(`string_field: 'single\\"quote'`, TestMessage);
+  t.equal(singleQuotes.stringField, 'single"quote', 'single quote string with escaped double quote');
+
+  const doubleQuotes = createAndParse(`string_field: "double\\'quote"`, TestMessage);
+  t.equal(doubleQuotes.stringField, "double'quote", 'double quote string with escaped single quote');
+
+  // Test adjacent string concatenation with escapes
+  const multiString = createAndParse('string_field: "Hello\\n" "World\\t" "!"', TestMessage);
+  t.equal(multiString.stringField, 'Hello\nWorld\t!', 'multi-string concatenation with escapes');
+
+  // Test edge cases with mixed quote types
+  const mixedQuotes = createAndParse(`string_field: "part1" 'part2' "part3"`, TestMessage);
+  t.equal(mixedQuotes.stringField, 'part1part2part3', 'mixed quote types concatenation');
 });
-*/
 
 test('Parser - Numeric formats', async(t) => {
   const testCases = [
