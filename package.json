@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Parser for the protobuf text format",
-  "main": "dist/parser.js",
-  "types": "dist/parser.d.ts",
+  "main": "dist/src/parser.js",
+  "types": "dist/src/parser.d.ts",
+  "files": ["dist/src"],
   "scripts": {
-    "demo": "tsc && node dist/demo.js testfile5.pb",
+    "demo": "tsc && node dist/src/demo.js testfile5.pb",
     "build": "tsc",
     "test": "tap",
     "test:update": "tap --snapshot"
